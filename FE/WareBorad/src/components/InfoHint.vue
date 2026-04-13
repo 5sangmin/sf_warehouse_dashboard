@@ -1,5 +1,7 @@
 <script setup>
-defineProps({
+import { nextTick, onBeforeUnmount, ref } from 'vue'
+
+const props = defineProps({
   title: {
     type: String,
     required: true,
@@ -17,23 +19,142 @@ defineProps({
     default: 'left',
   },
 })
+
+const detailsRef = ref(null)
+const triggerRef = ref(null)
+const cardRef = ref(null)
+const isOpen = ref(false)
+const popoverTop = ref(0)
+const popoverLeft = ref(0)
+const popoverZIndex = ref(6000)
+
+function nextZIndex() {
+  if (typeof document === 'undefined') return 3001
+  const root = document.documentElement
+  const current = Number(root?.dataset?.infoHintZSeed ?? 6000)
+  const safeCurrent = Number.isFinite(current) ? current : 6000
+  const next = safeCurrent + 1
+  root.dataset.infoHintZSeed = String(next)
+  return next
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max)
+}
+
+function updatePosition() {
+  const triggerEl = triggerRef.value
+  const cardEl = cardRef.value
+  if (!triggerEl || !cardEl) return
+
+  const anchor = triggerEl.getBoundingClientRect()
+  const cardBox = cardEl.getBoundingClientRect()
+  const padding = 10
+  const offset = 10
+
+  let top = anchor.bottom + offset
+  const bottomOverflow = top + cardBox.height > window.innerHeight - padding
+  if (bottomOverflow) {
+    const aboveTop = anchor.top - offset - cardBox.height
+    top = aboveTop >= padding ? aboveTop : Math.max(padding, window.innerHeight - padding - cardBox.height)
+  }
+
+  const preferredLeft = props.align === 'right' ? anchor.right - cardBox.width : anchor.left
+  const left = clamp(preferredLeft, padding, window.innerWidth - padding - cardBox.width)
+
+  popoverTop.value = Math.round(top)
+  popoverLeft.value = Math.round(left)
+}
+
+let listenersBound = false
+
+function unbindListeners() {
+  if (!listenersBound) return
+  listenersBound = false
+  window.removeEventListener('resize', updatePosition)
+  window.removeEventListener('scroll', updatePosition, true)
+  document.removeEventListener('pointerdown', handleOutsidePointerDown, true)
+  document.removeEventListener('keydown', handleKeyDown, true)
+}
+
+function bindListeners() {
+  if (listenersBound) return
+  listenersBound = true
+  window.addEventListener('resize', updatePosition)
+  window.addEventListener('scroll', updatePosition, true)
+  document.addEventListener('pointerdown', handleOutsidePointerDown, true)
+  document.addEventListener('keydown', handleKeyDown, true)
+}
+
+function close() {
+  const detailsEl = detailsRef.value
+  if (detailsEl?.open) detailsEl.open = false
+  isOpen.value = false
+  unbindListeners()
+}
+
+function handleOutsidePointerDown(event) {
+  const target = event.target
+  const detailsEl = detailsRef.value
+  const cardEl = cardRef.value
+  if (detailsEl?.contains(target)) return
+  if (cardEl?.contains(target)) return
+  close()
+}
+
+function handleKeyDown(event) {
+  if (!isOpen.value) return
+  if (event.key !== 'Escape') return
+  event.preventDefault()
+  close()
+  triggerRef.value?.focus?.()
+}
+
+async function handleToggle() {
+  const detailsEl = detailsRef.value
+  const nextOpen = Boolean(detailsEl?.open)
+  if (!nextOpen) {
+    close()
+    return
+  }
+
+  isOpen.value = true
+  popoverZIndex.value = nextZIndex()
+  await nextTick()
+  updatePosition()
+  bindListeners()
+  requestAnimationFrame(updatePosition)
+}
+
+onBeforeUnmount(() => {
+  unbindListeners()
+})
 </script>
 
 <template>
-  <details class="info-hint" :class="`align-${align}`">
-    <summary class="info-trigger">
+  <details ref="detailsRef" class="info-hint" @toggle="handleToggle">
+    <summary ref="triggerRef" class="info-trigger">
       <span aria-hidden="true">?</span>
-      <span class="sr-only">{{ title }} information</span>
+      <span class="sr-only">{{ props.title }} information</span>
     </summary>
 
-    <div class="info-card">
-      <p class="info-title">{{ title }}</p>
-      <p v-if="body" class="info-body">{{ body }}</p>
+    <Teleport to="body">
+      <div
+        v-if="isOpen"
+        ref="cardRef"
+        class="info-card"
+        :style="{ top: `${popoverTop}px`, left: `${popoverLeft}px`, zIndex: popoverZIndex }"
+        role="dialog"
+        :aria-label="`${props.title} details`"
+      >
+        <p class="info-title">{{ props.title }}</p>
+        <p v-if="props.body" class="info-body">{{ props.body }}</p>
 
-      <ul v-if="points.length" class="info-list">
-        <li v-for="item in points" :key="item">{{ item }}</li>
-      </ul>
-    </div>
+        <ul v-if="props.points.length" class="info-list">
+          <li v-for="item in props.points" :key="item">{{ item }}</li>
+        </ul>
+      </div>
+    </Teleport>
   </details>
 </template>
 
@@ -69,10 +190,8 @@ defineProps({
 }
 
 .info-card {
-  position: absolute;
-  top: calc(100% + 0.65rem);
-  left: 0;
-  z-index: 30;
+  position: fixed;
+  z-index: 6000;
   width: min(20rem, 70vw);
   padding: 0.9rem 1rem;
   border-radius: 1rem;
@@ -81,11 +200,6 @@ defineProps({
   color: #334155;
   box-shadow: 0 22px 50px rgba(15, 23, 42, 0.18);
   backdrop-filter: blur(14px);
-}
-
-.align-right .info-card {
-  right: 0;
-  left: auto;
 }
 
 .info-title {
