@@ -27,36 +27,43 @@
     </select>
 
     <select id="getFactoriesOverview" resultType="com.example.demo.dto.FactoryOverviewResponse">
-        SELECT ws.layout_id,
-               ws.scenario_id,
-               ws.snapshot_time,
-               ws.avg_delay_minutes_next_30m,
-               ws.order_inflow_15m,
-               ws.robot_active,
-               ws.robot_idle,
-               ws.robot_charging,
-               ws.avg_idle_duration_min,
-               ws.congestion_score
-        FROM warehouse_snapshot ws
-                 JOIN (
-            SELECT layout_id,
-                   MAX(snapshot_time) AS snapshot_time
-            FROM warehouse_snapshot
+        SELECT ranked.layout_id,
+               ranked.scenario_id,
+               ranked.snapshot_time,
+               ranked.avg_delay_minutes_next_30m,
+               ranked.order_inflow_15m,
+               ranked.robot_active,
+               ranked.robot_idle,
+               ranked.robot_charging,
+               ranked.avg_idle_duration_min,
+               ranked.congestion_score
+        FROM (
+            SELECT ws.layout_id,
+                   ws.scenario_id,
+                   ws.snapshot_time,
+                   ws.avg_delay_minutes_next_30m,
+                   ws.order_inflow_15m,
+                   ws.robot_active,
+                   ws.robot_idle,
+                   ws.robot_charging,
+                   ws.avg_idle_duration_min,
+                   ws.congestion_score,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY ws.layout_id
+                       ORDER BY ws.snapshot_time DESC,
+                                ws.scenario_id IS NULL ASC,
+                                ws.scenario_id ASC
+                   ) AS rn
+            FROM warehouse_snapshot ws
             <if test="layoutIds != null and layoutIds.size() > 0">
-                WHERE layout_id IN
+                WHERE ws.layout_id IN
                 <foreach collection="layoutIds" item="layoutId" open="(" separator="," close=")">
                     #{layoutId}
                 </foreach>
             </if>
-            GROUP BY layout_id
-        ) latest ON ws.layout_id = latest.layout_id AND ws.snapshot_time = latest.snapshot_time
-        WHERE ws.scenario_id = (
-            SELECT MIN(scenario_id)
-            FROM warehouse_snapshot ws2
-            WHERE ws2.layout_id = ws.layout_id
-              AND ws2.snapshot_time = ws.snapshot_time
-        )
-        ORDER BY ws.layout_id ASC
+        ) ranked
+        WHERE ranked.rn = 1
+        ORDER BY ranked.layout_id ASC
     </select>
 
     <select id="getFactoryInfo" resultType="com.example.demo.dto.FactoryDetailResponse">

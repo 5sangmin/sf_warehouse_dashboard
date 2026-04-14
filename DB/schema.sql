@@ -119,6 +119,7 @@ CREATE TABLE warehouse_snapshot (
     sort_accuracy_pct DOUBLE,
     avg_delay_minutes_next_30m DOUBLE,
     INDEX idx_snapshot_lookup (layout_id, scenario_id, snapshot_time),
+    INDEX idx_snapshot_layout_time_scenario (layout_id, snapshot_time, scenario_id),
     CONSTRAINT fk_layout FOREIGN KEY (layout_id)
         REFERENCES warehouse_layout(layout_id)
         ON DELETE RESTRICT

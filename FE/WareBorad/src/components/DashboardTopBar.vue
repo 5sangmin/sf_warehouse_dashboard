@@ -14,6 +14,7 @@ const showContextSelectors = computed(() => !isAdminRoute.value && hasFactories.
 const pageTitle = computed(() => {
   const name = route.name
   if (name === 'adminPermissions') return dashboard.text.nav.permissions
+  if (name === 'distributionSummary') return dashboard.text.nav.distributionSummary
   if (name === 'delayFlow') return dashboard.text.nav.delayFlow
   if (name === 'demandPressure') return dashboard.text.nav.demandPressure
   if (name === 'capacity') return dashboard.text.nav.capacity

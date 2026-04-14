@@ -4,6 +4,7 @@ export const dashboardCopy = {
     appTagline: 'Outbound control room',
     nav: {
       summary: 'Overall summary',
+      distributionSummary: 'Distribution summary',
       delayFlow: 'Delay flow',
       demandPressure: 'Demand pressure',
       capacity: 'Capacity',
@@ -88,6 +89,7 @@ export const dashboardCopy = {
     appTagline: '출고 관제',
     nav: {
       summary: '전체요약',
+      distributionSummary: '전체 분포 요약',
       delayFlow: '지연 누적 흐름',
       demandPressure: '수요 압력',
       capacity: '가동 여력',
