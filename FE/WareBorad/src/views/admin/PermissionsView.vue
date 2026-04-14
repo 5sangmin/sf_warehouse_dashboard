@@ -10,6 +10,7 @@ const auth = useAuthStore()
 const users = ref([])
 const selectedUserId = ref(null)
 const selectedFactoryIds = ref([])
+const factorySearch = ref('')
 
 const isLoading = ref(false)
 const isSaving = ref(false)
@@ -17,14 +18,55 @@ const message = ref('')
 const errorMessage = ref('')
 
 const factoryOptions = computed(() => dashboard.factories.map((factory) => factory.layoutId))
+const filteredFactoryOptions = computed(() => {
+  const query = factorySearch.value.trim().toLowerCase()
+  if (!query) return factoryOptions.value
+  return factoryOptions.value.filter((factoryId) => factoryId.toLowerCase().includes(query))
+})
+
+const sortedSelectedFactoryIds = computed(() =>
+  [...selectedFactoryIds.value].sort((left, right) => left.localeCompare(right)),
+)
+
+const selectedFactoryCountLabel = computed(() => {
+  const count = selectedFactoryIds.value.length
+  return dashboard.locale === 'ko' ? `선택 ${count}개` : `${count} selected`
+})
+
 const selectableUsers = computed(() => users.value.filter((user) => user.role !== 'GLOBAL_ADMIN'))
 const selectedUser = computed(() => selectableUsers.value.find((user) => user.id === selectedUserId.value) || null)
 
 watch(selectedUser, (user) => {
   selectedFactoryIds.value = user ? [...(user.factoryIds || [])] : []
+  factorySearch.value = ''
   message.value = ''
   errorMessage.value = ''
 })
+
+function selectAllFactories() {
+  selectedFactoryIds.value = [...factoryOptions.value]
+}
+
+function clearAllFactories() {
+  selectedFactoryIds.value = []
+}
+
+function selectFilteredFactories() {
+  const next = new Set(selectedFactoryIds.value)
+  for (const factoryId of filteredFactoryOptions.value) {
+    next.add(factoryId)
+  }
+  selectedFactoryIds.value = [...next]
+}
+
+function clearFilteredFactories() {
+  const toRemove = new Set(filteredFactoryOptions.value)
+  selectedFactoryIds.value = selectedFactoryIds.value.filter((factoryId) => !toRemove.has(factoryId))
+}
+
+function removeFactory(factoryId) {
+  selectedFactoryIds.value = selectedFactoryIds.value.filter((value) => value !== factoryId)
+}
 
 async function load() {
   isLoading.value = true
@@ -118,15 +160,71 @@ onMounted(() => {
       <article class="card">
         <div class="card-top">
           <p class="card-kicker">{{ dashboard.locale === 'ko' ? '공장 선택' : 'Factories' }}</p>
-          <button class="action" type="button" :disabled="!selectedUser || isSaving" @click="save">
-            {{ isSaving ? (dashboard.locale === 'ko' ? '저장 중...' : 'Saving...') : (dashboard.locale === 'ko' ? '저장' : 'Save') }}
-          </button>
+          <div class="card-actions">
+            <span v-if="selectedUser" class="count-pill">{{ selectedFactoryCountLabel }}</span>
+            <button class="action" type="button" :disabled="!selectedUser || isSaving" @click="save">
+              {{ isSaving ? (dashboard.locale === 'ko' ? '저장 중...' : 'Saving...') : (dashboard.locale === 'ko' ? '저장' : 'Save') }}
+            </button>
+          </div>
         </div>
 
         <p v-if="selectedUser" class="hint">
           <strong>{{ selectedUser.displayName }}</strong>
           <span>{{ dashboard.locale === 'ko' ? '에게 허용할 공장을 선택하세요.' : 'Select allowed factories.' }}</span>
         </p>
+
+        <div v-if="selectedUser" class="controls" aria-label="factory controls">
+          <div class="control-row">
+            <label class="search-field">
+              <span class="search-label">{{ dashboard.locale === 'ko' ? '검색' : 'Search' }}</span>
+              <input
+                v-model.trim="factorySearch"
+                type="search"
+                :placeholder="dashboard.locale === 'ko' ? '공장 ID 검색 (예: WH_001)' : 'Search factory IDs (e.g., WH_001)'"
+              />
+            </label>
+
+            <div class="bulk-actions" role="group" :aria-label="dashboard.locale === 'ko' ? '빠른 선택' : 'Quick selection'">
+              <button type="button" class="bulk-button" :disabled="!factoryOptions.length" @click="selectAllFactories">
+                {{ dashboard.locale === 'ko' ? '전체 선택' : 'Select all' }}
+              </button>
+              <button type="button" class="bulk-button" :disabled="!selectedFactoryIds.length" @click="clearAllFactories">
+                {{ dashboard.locale === 'ko' ? '전체 해제' : 'Clear all' }}
+              </button>
+              <button type="button" class="bulk-button" :disabled="!filteredFactoryOptions.length" @click="selectFilteredFactories">
+                {{ dashboard.locale === 'ko' ? '검색 선택' : 'Select shown' }}
+              </button>
+              <button
+                type="button"
+                class="bulk-button"
+                :disabled="!filteredFactoryOptions.length || !selectedFactoryIds.length"
+                @click="clearFilteredFactories"
+              >
+                {{ dashboard.locale === 'ko' ? '검색 해제' : 'Clear shown' }}
+              </button>
+            </div>
+          </div>
+
+          <div
+            v-if="sortedSelectedFactoryIds.length"
+            class="selected-cloud"
+            role="list"
+            :aria-label="dashboard.locale === 'ko' ? '선택된 공장' : 'Selected factories'"
+          >
+            <button
+              v-for="factoryId in sortedSelectedFactoryIds"
+              :key="factoryId"
+              type="button"
+              class="selected-chip"
+              role="listitem"
+              @click="removeFactory(factoryId)"
+              :title="dashboard.locale === 'ko' ? '클릭해서 제거' : 'Click to remove'"
+            >
+              <span>{{ factoryId }}</span>
+              <span class="chip-x" aria-hidden="true">×</span>
+            </button>
+          </div>
+        </div>
 
         <div v-if="message" class="state is-success">{{ message }}</div>
         <div v-if="errorMessage && !isLoading" class="state is-error">{{ errorMessage }}</div>
@@ -135,8 +233,16 @@ onMounted(() => {
           {{ dashboard.locale === 'ko' ? '왼쪽에서 관리자를 선택하세요.' : 'Select a manager on the left.' }}
         </div>
 
+        <div v-else-if="!factoryOptions.length" class="state">
+          {{ dashboard.locale === 'ko' ? '공장 데이터가 없습니다.' : 'No factories found.' }}
+        </div>
+
+        <div v-else-if="!filteredFactoryOptions.length" class="state">
+          {{ dashboard.locale === 'ko' ? '검색 결과가 없습니다.' : 'No matching factories.' }}
+        </div>
+
         <div v-else class="factory-grid" role="group" :aria-label="dashboard.text.factory">
-          <label v-for="factoryId in factoryOptions" :key="factoryId" class="factory-item">
+          <label v-for="factoryId in filteredFactoryOptions" :key="factoryId" class="factory-item">
             <input v-model="selectedFactoryIds" type="checkbox" :value="factoryId" />
             <span>{{ factoryId }}</span>
           </label>
@@ -230,6 +336,127 @@ h1 {
 .action:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  justify-content: flex-end;
+}
+
+.count-pill {
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  color: #475569;
+  font-weight: 900;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.controls {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem 0.95rem;
+  border-radius: 1.35rem;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(248, 250, 252, 0.84);
+}
+
+.control-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+
+.search-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.search-label {
+  color: #475569;
+  font-weight: 900;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.search-field input {
+  min-height: 2.75rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.95);
+  color: #0f172a;
+}
+
+.search-field input:focus {
+  outline: none;
+  border-color: rgba(37, 99, 235, 0.5);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
+}
+
+.bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.bulk-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.5rem 0.75rem;
+  background: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+  font-weight: 900;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
+
+.bulk-button:hover {
+  background: rgba(15, 23, 42, 0.12);
+}
+
+.bulk-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.selected-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-height: 7.5rem;
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
+.selected-chip {
+  border: 1px solid rgba(29, 78, 216, 0.2);
+  background: rgba(29, 78, 216, 0.08);
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 0.45rem 0.7rem;
+  font-weight: 900;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.selected-chip:hover {
+  border-color: rgba(29, 78, 216, 0.3);
+  background: rgba(29, 78, 216, 0.12);
+}
+
+.chip-x {
+  color: rgba(15, 23, 42, 0.6);
+  font-weight: 900;
 }
 
 .state {
@@ -331,6 +558,9 @@ h1 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.6rem;
+  max-height: 22rem;
+  overflow: auto;
+  padding-right: 0.25rem;
 }
 
 .factory-item {
@@ -367,4 +597,3 @@ h1 {
   }
 }
 </style>
-

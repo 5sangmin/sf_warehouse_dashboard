@@ -6,6 +6,7 @@ import App from './App.vue'
 import router from './router'
 import pinia from './stores/pinia'
 import { useAuthStore } from '@/stores/auth'
+import { useDashboardStore } from '@/stores/dashboard'
 
 const app = createApp(App)
 
@@ -18,6 +19,7 @@ auth.init()
 window.addEventListener('wb:unauthorized', () => {
   const store = useAuthStore(pinia)
   store.clearSession()
+  useDashboardStore(pinia).reset()
 
   const current = router.currentRoute.value
   if (current?.name === 'login') return

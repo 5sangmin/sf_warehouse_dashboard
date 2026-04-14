@@ -26,6 +26,7 @@ function isActive(name) {
 
 async function handleLogout() {
   await auth.logout()
+  dashboard.reset()
   await router.push({ name: 'login' })
 }
 </script>

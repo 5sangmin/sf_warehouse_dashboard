@@ -81,6 +81,23 @@ export const useDashboardStore = defineStore('dashboard', () => {
     selectedSnapshot.value = ''
   }
 
+  function reset() {
+    factories.value = []
+    scenarios.value = []
+    factoryInfo.value = null
+
+    selectedFactoryId.value = ''
+    selectedScenarioId.value = ''
+    selectedSnapshot.value = ''
+
+    isBooting.value = false
+    isFactoryLoading.value = false
+    isDashboardLoading.value = false
+    errorMessage.value = ''
+
+    clearDashboardData()
+  }
+
   const snapshotOptions = computed(() => {
     const timeline = [...shippingDelay.value, ...orderInflow.value, ...robotSummary.value, ...congestion.value]
     const values = Array.from(new Set(timeline.map((entry) => entry.snapshotTime).filter(Boolean)))
@@ -333,6 +350,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
       if (!factoryPayload.length) {
         selectedFactoryId.value = ''
+        selectedScenarioId.value = ''
+        await loadFactoryContext()
         return
       }
 
@@ -439,5 +458,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
     setFactory,
     setScenario,
     setSnapshot,
+    reset,
   }
 })

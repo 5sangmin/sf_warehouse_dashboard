@@ -8,6 +8,8 @@ const dashboard = useDashboardStore()
 const route = useRoute()
 
 const isAdminRoute = computed(() => route.name === 'adminPermissions')
+const hasFactories = computed(() => dashboard.factories.length > 0)
+const showContextSelectors = computed(() => !isAdminRoute.value && hasFactories.value)
 
 const pageTitle = computed(() => {
   const name = route.name
@@ -40,7 +42,7 @@ function handleSnapshotChange(event) {
         <strong>{{ pageTitle }}</strong>
       </div>
 
-      <div v-if="!isAdminRoute" class="chip-row" aria-label="context chips">
+      <div v-if="showContextSelectors" class="chip-row" aria-label="context chips">
         <span class="chip">
           <span class="chip-label">{{ dashboard.text.analysisWindow }}</span>
           <strong class="chip-value">{{ dashboard.timeWindowLabel }}</strong>
@@ -53,7 +55,7 @@ function handleSnapshotChange(event) {
     </div>
 
     <div class="topbar-right">
-      <template v-if="!isAdminRoute">
+      <template v-if="showContextSelectors">
         <label class="field">
           <span class="field-label">
             {{ dashboard.text.factory }}
