@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.mapper.WarehouseMapper">
+
+    <select id="getFactories" resultType="com.example.demo.dto.FactorySummaryResponse">
+        SELECT layout_id,
+               layout_type,
+               floor_area_sqm,
+               robot_total
+        FROM v_factories
+        ORDER BY layout_id ASC
+    </select>
+
+    <select id="getFactoriesByIds" resultType="com.example.demo.dto.FactorySummaryResponse">
+        SELECT layout_id,
+               layout_type,
+               floor_area_sqm,
+               robot_total
+        FROM v_factories
+        WHERE layout_id IN
+        <foreach collection="layoutIds" item="layoutId" open="(" separator="," close=")">
+            #{layoutId}
+        </foreach>
+        ORDER BY layout_id ASC
+    </select>
+
+    <select id="getFactoriesOverview" resultType="com.example.demo.dto.FactoryOverviewResponse">
+        SELECT ranked.layout_id,
+               ranked.scenario_id,
+               ranked.snapshot_time,
+               ranked.avg_delay_minutes_next_30m,
+               ranked.order_inflow_15m,
+               ranked.robot_active,
+               ranked.robot_idle,
+               ranked.robot_charging,
+               ranked.avg_idle_duration_min,
+               ranked.congestion_score
+        FROM (
+            SELECT ws.layout_id,
+                   ws.scenario_id,
+                   ws.snapshot_time,
+                   ws.avg_delay_minutes_next_30m,
+                   ws.order_inflow_15m,
+                   ws.robot_active,
+                   ws.robot_idle,
+                   ws.robot_charging,
+                   ws.avg_idle_duration_min,
+                   ws.congestion_score,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY ws.layout_id
+                       ORDER BY ws.snapshot_time DESC,
+                                ws.scenario_id IS NULL ASC,
+                                ws.scenario_id ASC
+                   ) AS rn
+            FROM warehouse_snapshot ws
+            <if test="layoutIds != null and layoutIds.size() > 0">
+                WHERE ws.layout_id IN
+                <foreach collection="layoutIds" item="layoutId" open="(" separator="," close=")">
+                    #{layoutId}
+                </foreach>
+            </if>
+        ) ranked
+        WHERE ranked.rn = 1
+        ORDER BY ranked.layout_id ASC
+    </select>
+
+    <select id="getFactoryInfo" resultType="com.example.demo.dto.FactoryDetailResponse">
+        SELECT layout_id,
+               layout_type,
+               floor_area_sqm,
+               robot_total
+        FROM v_factory_info
+        WHERE layout_id = #{layoutId}
+    </select>
+
+    <select id="getScenarios" resultType="com.example.demo.dto.ScenarioResponse">
+        SELECT layout_id,
+               scenario_id
+        FROM v_scenarios
+        WHERE layout_id = #{layoutId}
+        ORDER BY scenario_id ASC
+    </select>
+
+    <select id="getShippingDelay" resultType="com.example.demo.dto.ShippingDelayResponse">
+        SELECT layout_id,
+               scenario_id,
+               snapshot_time,
+               avg_delay_minutes_next_30m
+        FROM v_dashboard_shipping_delay
+        WHERE layout_id = #{layoutId}
+          AND scenario_id = #{scenarioId}
+        ORDER BY snapshot_time ASC
+    </select>
+
+    <select id="getOrderInflow" resultType="com.example.demo.dto.OrderInflowResponse">
+        SELECT layout_id,
+               scenario_id,
+               snapshot_time,
+               order_inflow_15m
+        FROM v_dashboard_order_inflow
+        WHERE layout_id = #{layoutId}
+          AND scenario_id = #{scenarioId}
+        ORDER BY snapshot_time ASC
+    </select>
+
+    <select id="getRobotSummary" resultType="com.example.demo.dto.RobotSummaryResponse">
+        SELECT layout_id,
+               scenario_id,
+               snapshot_time,
+               robot_active,
+               robot_idle,
+               robot_charging,
+               avg_idle_duration_min
+        FROM v_dashboard_robot_summary
+        WHERE layout_id = #{layoutId}
+          AND scenario_id = #{scenarioId}
+        ORDER BY snapshot_time ASC
+    </select>
+
+    <select id="getCongestion" resultType="com.example.demo.dto.CongestionResponse">
+        SELECT layout_id,
+               scenario_id,
+               snapshot_time,
+               congestion_score
+        FROM v_dashboard_congestion
+        WHERE layout_id = #{layoutId}
+          AND scenario_id = #{scenarioId}
+        ORDER BY snapshot_time ASC
+    </select>
+
+</mapper>

@@ -1,0 +1,161 @@
+CREATE DATABASE IF NOT EXISTS warehouse_db
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+USE warehouse_db;
+
+CREATE TABLE warehouse_layout (
+    layout_id VARCHAR(20) NOT NULL PRIMARY KEY,
+    layout_type VARCHAR(20),
+    aisle_width_avg DOUBLE,
+    intersection_count INT,
+    one_way_ratio DOUBLE,
+    pack_station_count INT,
+    charger_count INT,
+    layout_compactness DOUBLE,
+    zone_dispersion DOUBLE,
+    robot_total INT,
+    building_age_years INT,
+    floor_area_sqm INT,
+    ceiling_height_m DOUBLE,
+    fire_sprinkler_count INT,
+    emergency_exit_count INT
+);
+
+CREATE TABLE warehouse_snapshot (
+    id VARCHAR(20) NOT NULL PRIMARY KEY,
+    layout_id VARCHAR(20) NOT NULL,
+    scenario_id VARCHAR(20),
+    snapshot_time DATETIME NOT NULL,
+    order_inflow_15m DOUBLE,
+    unique_sku_15m INT,
+    avg_items_per_order DOUBLE,
+    urgent_order_ratio DOUBLE,
+    heavy_item_ratio DOUBLE,
+    cold_chain_ratio DOUBLE,
+    sku_concentration DOUBLE,
+    robot_active INT,
+    robot_idle INT,
+    robot_charging INT,
+    robot_utilization DOUBLE,
+    avg_trip_distance DOUBLE,
+    task_reassign_15m DOUBLE,
+    battery_mean DOUBLE,
+    battery_std DOUBLE,
+    low_battery_ratio DOUBLE,
+    charge_queue_length DOUBLE,
+    avg_charge_wait DOUBLE,
+    congestion_score DOUBLE,
+    max_zone_density DOUBLE,
+    blocked_path_15m INT,
+    near_collision_15m INT,
+    fault_count_15m INT,
+    avg_recovery_time DOUBLE,
+    replenishment_overlap DOUBLE,
+    pack_utilization DOUBLE,
+    manual_override_ratio DOUBLE,
+    warehouse_temp_avg DOUBLE,
+    humidity_pct DOUBLE,
+    day_of_week DOUBLE,
+    external_temp_c DOUBLE,
+    wind_speed_kmh DOUBLE,
+    precipitation_mm DOUBLE,
+    lighting_level_lux DOUBLE,
+    ambient_noise_db DOUBLE,
+    floor_vibration_idx DOUBLE,
+    return_order_ratio DOUBLE,
+    air_quality_idx DOUBLE,
+    co2_level_ppm DOUBLE,
+    hvac_power_kw DOUBLE,
+    wms_response_time_ms DOUBLE,
+    scanner_error_rate DOUBLE,
+    wifi_signal_db DOUBLE,
+    network_latency_ms DOUBLE,
+    worker_avg_tenure_months DOUBLE,
+    safety_score_monthly DOUBLE,
+    label_print_queue INT,
+    barcode_read_success_rate DOUBLE,
+    ups_battery_pct DOUBLE,
+    lighting_zone_variance DOUBLE,
+    shift_hour INT,
+    staff_on_floor DOUBLE,
+    forklift_active_count INT,
+    loading_dock_util DOUBLE,
+    conveyor_speed_mps DOUBLE,
+    prev_shift_volume INT,
+    avg_package_weight_kg DOUBLE,
+    inventory_turnover_rate DOUBLE,
+    daily_forecast_accuracy DOUBLE,
+    order_wave_count INT,
+    pick_list_length_avg DOUBLE,
+    express_lane_util DOUBLE,
+    bulk_order_ratio DOUBLE,
+    staging_area_util DOUBLE,
+    cold_storage_temp_c DOUBLE,
+    pallet_wrap_time_min DOUBLE,
+    fleet_age_months_avg DOUBLE,
+    maintenance_schedule_score DOUBLE,
+    robot_firmware_update_days INT,
+    avg_idle_duration_min DOUBLE,
+    charge_efficiency_pct DOUBLE,
+    battery_cycle_count_avg INT,
+    agv_task_success_rate DOUBLE,
+    robot_calibration_score DOUBLE,
+    aisle_traffic_score DOUBLE,
+    zone_temp_variance DOUBLE,
+    path_optimization_score DOUBLE,
+    intersection_wait_time_avg DOUBLE,
+    storage_density_pct DOUBLE,
+    vertical_utilization DOUBLE,
+    racking_height_avg_m DOUBLE,
+    cross_dock_ratio DOUBLE,
+    packaging_material_cost DOUBLE,
+    quality_check_rate DOUBLE,
+    outbound_truck_wait_min DOUBLE,
+    dock_to_stock_hours DOUBLE,
+    kpi_otd_pct DOUBLE,
+    backorder_ratio DOUBLE,
+    shift_handover_delay_min DOUBLE,
+    sort_accuracy_pct DOUBLE,
+    avg_delay_minutes_next_30m DOUBLE,
+    INDEX idx_snapshot_lookup (layout_id, scenario_id, snapshot_time),
+    INDEX idx_snapshot_layout_time_scenario (layout_id, snapshot_time, scenario_id),
+    CONSTRAINT fk_layout FOREIGN KEY (layout_id)
+        REFERENCES warehouse_layout(layout_id)
+        ON DELETE RESTRICT
+);
+
+CREATE TABLE app_user (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    display_name VARCHAR(80) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(40) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE user_factory_access (
+    user_id BIGINT NOT NULL,
+    layout_id VARCHAR(20) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, layout_id),
+    CONSTRAINT fk_user_factory_user FOREIGN KEY (user_id)
+        REFERENCES app_user(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_user_factory_layout FOREIGN KEY (layout_id)
+        REFERENCES warehouse_layout(layout_id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE auth_token (
+    token VARCHAR(96) NOT NULL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_auth_token_user FOREIGN KEY (user_id)
+        REFERENCES app_user(id)
+        ON DELETE CASCADE,
+    INDEX idx_auth_token_user (user_id),
+    INDEX idx_auth_token_expires (expires_at)
+);
